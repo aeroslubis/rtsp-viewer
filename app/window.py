@@ -130,3 +130,7 @@ class MainWindow(QMainWindow):
         for ch in range(4):
             self.stop_single_stream(ch)
         event.accept()
+        from PyQt5.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            app.quit()

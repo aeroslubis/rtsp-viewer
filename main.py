@@ -31,7 +31,9 @@ def main():
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec_())
+    ret = app.exec_()
+    # Ensure immediate, clean return to terminal shell
+    os._exit(ret)
 
 
 if __name__ == "__main__":

@@ -10,4 +10,4 @@ if ! command -v ffmpeg &>/dev/null; then
     exit 1
 fi
 
-python3 "$SCRIPT_DIR/main.py" "$@"
+exec python3 "$SCRIPT_DIR/main.py" "$@"

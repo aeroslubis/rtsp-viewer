@@ -1,6 +1,6 @@
 """
 stream_worker.py - Low-Latency RTSP Stream Worker
-Automatically recognizes any stream resolution and codec.
+Automatically recognizes any stream resolution and codec with instant clean shutdown.
 """
 
 import subprocess
@@ -47,8 +47,9 @@ class StreamWorker(QThread):
                 cmd = self._build_ffmpeg_cmd(url)
                 proc = subprocess.Popen(
                     cmd,
+                    stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
                     bufsize=0
                 )
                 self._ffmpeg_proc = proc
@@ -135,14 +136,13 @@ class StreamWorker(QThread):
                 "-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"
             ]
 
-        transport = "tcp"
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error"
         ]
 
         if url.startswith("rtsp://"):
             cmd.extend([
-                "-rtsp_transport", transport,
+                "-rtsp_transport", "tcp",
                 "-timeout", "5000000"  # 5s socket timeout
             ])
 
@@ -161,28 +161,27 @@ class StreamWorker(QThread):
         return cmd
 
     def _cleanup_stream_proc(self):
+        """Immediately terminate child process and close handles without deadlock."""
         proc = self._ffmpeg_proc
         self._ffmpeg_proc = None
         if proc:
+            # Kill process immediately to close OS pipe and unblock read()
             try:
-                proc.stdout.close()
+                proc.kill()
             except Exception:
                 pass
             try:
-                proc.stderr.close()
+                proc.wait(timeout=0.1)
             except Exception:
                 pass
             try:
-                proc.terminate()
-                proc.wait(timeout=1.0)
+                if proc.stdout:
+                    proc.stdout.close()
             except Exception:
-                try:
-                    proc.kill()
-                    proc.wait(timeout=0.5)
-                except Exception:
-                    pass
+                pass
 
     def stop(self):
+        """Stop worker and kill subprocess immediately."""
         self._running = False
         self._cleanup_stream_proc()
-        self.wait(1500)
+        self.wait(300)
