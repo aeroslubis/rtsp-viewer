@@ -28,18 +28,36 @@ Dibangun dengan **Python 3**, **PyQt5**, dan **FFmpeg** dengan dukungan **URL Ma
 
 ---
 
+## Pemasangan & Integrasi Desktop
+
+Jalankan installer untuk mendaftarkan aplikasi ke menu desktop Linux dan membuat shortcut terminal:
+```bash
+./install.sh
+```
+
+Untuk menghapus instalasi dari menu desktop:
+```bash
+./install.sh --uninstall
+```
+
+---
+
 ## Cara Menjalankan
 
-Melalui terminal:
-```bash
-cd /home/aeros/Work/rtsp_viewer
-./run.sh
-```
-
-Atau langsung:
-```bash
-python3 /home/aeros/Work/rtsp_viewer/main.py
-```
+Aplikasi dapat dijalankan melalui:
+1. **Menu Aplikasi Linux**: Cari dan klik **RTSP Multi-View**
+2. **Terminal (Global)**:
+   ```bash
+   rtsp-viewer
+   ```
+3. **Langsung dari folder proyek**:
+   ```bash
+   ./run.sh
+   ```
+   atau:
+   ```bash
+   python3 main.py
+   ```
 
 ---
 

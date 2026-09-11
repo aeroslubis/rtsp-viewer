@@ -1,8 +1,9 @@
-"""
-styles.py - Polished Modern Dark Theme Stylesheet for RTSP Multi-View
-"""
+from pathlib import Path
 
-DARK_THEME_QSS = """
+_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+_ARROW_DOWN_ICON = (_ASSETS_DIR / "icons" / "arrow_down.svg").as_posix()
+
+DARK_THEME_TEMPLATE = """
 /* Global Window & Dialog Background */
 QMainWindow, QDialog, QWidget {
     background-color: #030712;
@@ -59,7 +60,7 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    image: url(/home/aeros/Work/rtsp_viewer/assets/icons/arrow_down.svg);
+    image: url(__ARROW_DOWN_ICON__);
     width: 12px;
     height: 12px;
 }
@@ -229,3 +230,6 @@ QPushButton#btnTestStream:disabled {
     border-color: #1e293b;
 }
 """
+
+DARK_THEME_QSS = DARK_THEME_TEMPLATE.replace("__ARROW_DOWN_ICON__", _ARROW_DOWN_ICON)
+
