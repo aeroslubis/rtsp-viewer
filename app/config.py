@@ -1,6 +1,6 @@
 """
 config.py - Configuration Manager supporting 4, 6, and 12 RTSP Channels
-Defaults strictly to TCP for maximum stability and low latency.
+Features intelligent dual-stream resolution (102 for live grid, 101 for fullscreen).
 """
 
 import json
@@ -30,6 +30,36 @@ DEFAULT_CONFIG = {
 }
 
 
+def resolve_stream_url(url: str, is_fullscreen: bool) -> str:
+    """
+    Intelligently select stream endpoint:
+    - is_fullscreen=False (Live Grid): uses stream 102 (Sub Stream / SD) for low CPU & bandwidth.
+    - is_fullscreen=True (Fullscreen View): uses stream 101 (Main Stream / HD) for crystal clear video.
+    """
+    url = url.strip()
+    if not url:
+        return ""
+
+    if is_fullscreen:
+        # Main Stream 101 (HD)
+        if "/102" in url:
+            return url.replace("/102", "/101", 1)
+        elif "subtype=1" in url:
+            return url.replace("subtype=1", "subtype=0", 1)
+        elif "/stream2" in url:
+            return url.replace("/stream2", "/stream1", 1)
+        return url
+    else:
+        # Sub Stream 102 (SD)
+        if "/101" in url:
+            return url.replace("/101", "/102", 1)
+        elif "subtype=0" in url:
+            return url.replace("subtype=0", "subtype=1", 1)
+        elif "/stream1" in url:
+            return url.replace("/stream1", "/stream2", 1)
+        return url
+
+
 def load_config() -> dict:
     """Load configuration from file, or return default. Preserves existing channels."""
     config = dict(DEFAULT_CONFIG)
@@ -44,7 +74,6 @@ def load_config() -> dict:
                 # Merge saved general settings
                 if "general" in saved:
                     config["general"].update(saved["general"])
-                    # Validate stream_count
                     sc = config["general"].get("stream_count", 4)
                     if sc not in SUPPORTED_STREAM_COUNTS:
                         config["general"]["stream_count"] = 4

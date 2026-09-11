@@ -11,7 +11,7 @@ QMainWindow, QDialog, QWidget {
     font-size: 13px;
 }
 
-/* Dialog Frame & Card */
+/* Dialog Frame & Cards */
 QDialog {
     background-color: #0b0f19;
 }
@@ -20,6 +20,71 @@ QFrame#settingsCard {
     background-color: #0f172a;
     border: 1px solid #1e293b;
     border-radius: 8px;
+}
+
+QFrame#topCard {
+    background-color: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+}
+
+/* ComboBox Dropdown Styling */
+QComboBox {
+    background-color: #1e293b;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 36px 6px 12px;
+    font-weight: 500;
+    min-height: 22px;
+}
+
+QComboBox:hover {
+    border-color: #0284c7;
+    background-color: #243044;
+}
+
+QComboBox:focus {
+    border-color: #38bdf8;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
+    border-left: 1px solid #334155;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: #1e293b;
+}
+
+QComboBox::down-arrow {
+    image: url(/home/aeros/Work/rtsp_viewer/assets/icons/arrow_down.svg);
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px;
+    outline: none;
+    selection-background-color: #2563eb;
+    selection-color: #ffffff;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 30px;
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 13px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #2563eb;
+    color: #ffffff;
 }
 
 /* Context Menu */
@@ -32,7 +97,7 @@ QMenu {
 }
 
 QMenu::item {
-    padding: 7px 22px 7px 10px;
+    padding: 8px 24px 8px 12px;
     border-radius: 5px;
     font-size: 13px;
 }

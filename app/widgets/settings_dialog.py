@@ -1,6 +1,6 @@
 """
 settings_dialog.py - RTSP Stream Settings Dialog for 4, 6, or 12 Channels
-Allows selecting layout stream count (4, 6, 12), configuring each channel, and testing stream URLs.
+Features neatly aligned grid dropdown, dual-stream (101/102) testing, and vector icons.
 """
 
 import subprocess
@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QGridLayout, QFrame, QComboBox
 )
 
-from app.config import save_config, MAX_CHANNELS, SUPPORTED_STREAM_COUNTS
+from app.config import save_config, resolve_stream_url, MAX_CHANNELS
 from app.icons import get_icon, get_app_icon
 
 
@@ -69,7 +69,11 @@ class ProbeWorker(QThread):
                     except Exception:
                         pass
 
-                msg = f"✓ Terhubung! Resolusi: {w}x{h} ({codec}{fps_str})"
+                dual_info = ""
+                if "/101" in self.url or "/102" in self.url:
+                    dual_info = " (Otomatis: 102 Live Grid / 101 Fullscreen)"
+
+                msg = f"✓ Terhubung! Resolusi: {w}x{h} ({codec}{fps_str}){dual_info}"
                 self.probe_finished.emit(True, msg)
             else:
                 err = proc.stderr.strip()
@@ -91,7 +95,7 @@ class ProbeWorker(QThread):
 
 
 class SettingsDialog(QDialog):
-    """Configuration dialog supporting 4, 6, and 12 stream channels."""
+    """Clean, polished configuration dialog for 4, 6, and 12 stream channels."""
     settings_saved = pyqtSignal(dict)
 
     def __init__(self, config: dict, active_tab_index: int = 0, parent=None):
@@ -108,16 +112,22 @@ class SettingsDialog(QDialog):
         main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(12)
 
-        # Top Control: Grid Stream Count Selection
-        top_bar = QHBoxLayout()
-        lbl_count = QLabel("Jumlah Stream Tampil:")
+        # Top Card: Neatly Formatted Grid Selection
+        top_card = QFrame(self)
+        top_card.setObjectName("topCard")
+        top_layout = QHBoxLayout(top_card)
+        top_layout.setContentsMargins(14, 8, 14, 8)
+        top_layout.setSpacing(12)
+
+        lbl_count = QLabel("Tata Letak Grid:")
         lbl_count.setStyleSheet("font-weight: 600; color: #f1f5f9; font-size: 13px;")
-        top_bar.addWidget(lbl_count)
+        top_layout.addWidget(lbl_count)
 
         self.cmb_stream_count = QComboBox()
-        self.cmb_stream_count.addItem("4 Stream (2x2 Grid)", 4)
-        self.cmb_stream_count.addItem("6 Stream (2x3 Grid)", 6)
-        self.cmb_stream_count.addItem("12 Stream (3x4 Grid)", 12)
+        self.cmb_stream_count.setFixedWidth(240)
+        self.cmb_stream_count.addItem("2 × 2 Grid  (4 Stream)", 4)
+        self.cmb_stream_count.addItem("2 × 3 Grid  (6 Stream)", 6)
+        self.cmb_stream_count.addItem("3 × 4 Grid  (12 Stream)", 12)
 
         current_count = self.config.get("general", {}).get("stream_count", 4)
         if current_count == 6:
@@ -128,9 +138,9 @@ class SettingsDialog(QDialog):
             self.cmb_stream_count.setCurrentIndex(0)
 
         self.cmb_stream_count.currentIndexChanged.connect(self._on_stream_count_changed)
-        top_bar.addWidget(self.cmb_stream_count)
-        top_bar.addStretch()
-        main_layout.addLayout(top_bar)
+        top_layout.addWidget(self.cmb_stream_count)
+        top_layout.addStretch()
+        main_layout.addWidget(top_card)
 
         # Tab Widget for 12 Channels
         self.tabs = QTabWidget(self)
@@ -206,12 +216,12 @@ class SettingsDialog(QDialog):
         url_row = QHBoxLayout()
         url_row.setSpacing(6)
         txt_url = QLineEdit(ch_cfg.get("url", ""))
-        txt_url.setPlaceholderText("rtsp://username:password@ip:port/stream")
+        txt_url.setPlaceholderText("rtsp://username:password@ip:port/stream/101")
         url_row.addWidget(txt_url, 1)
 
         btn_test = QPushButton("Uji Stream")
         btn_test.setIcon(get_icon("search"))
-        btn_test.setToolTip("Tes koneksi dan otomatis deteksi resolusi stream ini")
+        btn_test.setToolTip("Tes koneksi stream (otomatis deteksi 101 HD dan 102 SD)")
         btn_test.setObjectName("btnTestStream")
         url_row.addWidget(btn_test)
 

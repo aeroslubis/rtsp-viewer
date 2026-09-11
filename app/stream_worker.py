@@ -1,6 +1,6 @@
 """
 stream_worker.py - Low-Latency RTSP Stream Worker
-Automatically recognizes any stream resolution and codec with instant clean shutdown.
+Supports dual-stream: stream 102 (Sub Stream) in grid mode, stream 101 (Main Stream) in fullscreen.
 """
 
 import subprocess
@@ -10,19 +10,23 @@ from typing import Optional
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
 
+from app.config import resolve_stream_url
+
 
 class StreamWorker(QThread):
     """
     Worker thread that decodes an RTSP stream using FFmpeg.
     Automatically recognizes any stream resolution dynamically.
+    Switches between sub-stream (102) and main-stream (101) based on fullscreen state.
     """
     frame_ready = pyqtSignal(int, QImage, float)   # channel_id, QImage, fps
     status_changed = pyqtSignal(int, str, str)     # channel_id, status_code, message
 
-    def __init__(self, channel_id: int, config: dict, parent=None):
+    def __init__(self, channel_id: int, config: dict, is_fullscreen: bool = False, parent=None):
         super().__init__(parent)
         self.channel_id = channel_id
         self.config = config
+        self.is_fullscreen = is_fullscreen
         self._running = False
         self._ffmpeg_proc: Optional[subprocess.Popen] = None
         self._last_frame: Optional[QImage] = None
@@ -30,21 +34,32 @@ class StreamWorker(QThread):
     def update_config(self, new_config: dict):
         self.config = new_config
 
+    def set_fullscreen(self, is_fullscreen: bool):
+        self.is_fullscreen = is_fullscreen
+
     def run(self):
         self._running = True
         reconnect_interval = self.config.get("reconnect_interval_sec", 4)
         auto_reconnect = self.config.get("auto_reconnect", True)
 
         while self._running:
-            url = self.config.get("url", "").strip()
-            if not url:
+            raw_url = self.config.get("url", "").strip()
+            if not raw_url:
                 self.status_changed.emit(self.channel_id, "stopped", "Belum ada URL")
                 break
 
-            self.status_changed.emit(self.channel_id, "connecting", "Menghubungkan...")
+            # Resolve to stream 101 (HD) if fullscreen, or 102 (SD) if grid
+            active_url = resolve_stream_url(raw_url, self.is_fullscreen)
+            stream_type = "101 HD" if self.is_fullscreen else "102 SD"
+
+            self.status_changed.emit(
+                self.channel_id,
+                "connecting",
+                f"Menghubungkan ({stream_type})..."
+            )
 
             try:
-                cmd = self._build_ffmpeg_cmd(url)
+                cmd = self._build_ffmpeg_cmd(active_url)
                 proc = subprocess.Popen(
                     cmd,
                     stdin=subprocess.DEVNULL,
@@ -98,7 +113,7 @@ class StreamWorker(QThread):
                             self.status_changed.emit(
                                 self.channel_id,
                                 "live",
-                                f"Live ({qimg.width()}x{qimg.height()})"
+                                f"Live {qimg.width()}x{qimg.height()} [{stream_type}]"
                             )
 
                         self.frame_ready.emit(self.channel_id, qimg, current_fps)
@@ -165,7 +180,6 @@ class StreamWorker(QThread):
         proc = self._ffmpeg_proc
         self._ffmpeg_proc = None
         if proc:
-            # Kill process immediately to close OS pipe and unblock read()
             try:
                 proc.kill()
             except Exception:
