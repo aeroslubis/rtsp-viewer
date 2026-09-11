@@ -10,6 +10,7 @@ from PyQt5.QtGui import QPainter, QColor, QFont, QImage, QPaintEvent, QContextMe
 from PyQt5.QtWidgets import QWidget, QMenu, QAction, QSizePolicy
 
 from app.stream_worker import StreamWorker
+from app.icons import get_icon
 
 
 class VideoWidget(QWidget):
@@ -65,38 +66,20 @@ class VideoWidget(QWidget):
     def contextMenuEvent(self, event: QContextMenuEvent):
         """Right click context menu for quick controls & settings."""
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1f2937;
-                color: #f3f4f6;
-                border: 1px solid #374151;
-                border-radius: 6px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 6px 18px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #2563eb;
-                color: #ffffff;
-            }
-        """)
 
-        act_title = menu.addAction(f"📹 {self._camera_name}")
+        act_title = menu.addAction(get_icon("camera"), self._camera_name)
         act_title.setEnabled(False)
         menu.addSeparator()
 
-        act_reconnect = menu.addAction("🔄 Hubungkan Ulang")
+        act_settings = menu.addAction(get_icon("settings"), "Pengaturan Kamera...")
+        act_settings.triggered.connect(lambda: self.request_settings.emit(self.channel_id))
+
+        act_reconnect = menu.addAction(get_icon("refresh"), "Hubungkan Ulang")
         act_reconnect.triggered.connect(lambda: self.request_reconnect.emit(self.channel_id))
 
         if self.worker and self.worker.isRunning():
-            act_stop = menu.addAction("■ Hentikan Stream")
+            act_stop = menu.addAction(get_icon("stop"), "Hentikan Stream")
             act_stop.triggered.connect(self.worker.stop)
-
-        menu.addSeparator()
-        act_settings = menu.addAction("⚙ Pengaturan Kamera...")
-        act_settings.triggered.connect(lambda: self.request_settings.emit(self.channel_id))
 
         menu.exec_(event.globalPos())
 
@@ -126,7 +109,7 @@ class VideoWidget(QWidget):
             y = (self.height() - scaled.height()) // 2
             painter.drawImage(x, y, scaled)
 
-            # Subtle camera name in top-left
+            # Subtle camera name and detected resolution in top-left
             self._draw_subtle_label(painter, x + 8, y + 8)
         else:
             # Placeholder when offline / connecting
@@ -142,13 +125,14 @@ class VideoWidget(QWidget):
             text = f"{self._camera_name} ({self._image.width()}x{self._image.height()})"
         else:
             text = self._camera_name
+
         font = QFont("Ubuntu", 9, QFont.Bold)
         painter.setFont(font)
         fm = painter.fontMetrics()
         w = fm.horizontalAdvance(text) + 12
         h = fm.height() + 6
 
-        painter.fillRect(x, y, w, h, QColor(0, 0, 0, 140))
+        painter.fillRect(x, y, w, h, QColor(0, 0, 0, 150))
         painter.setPen(QColor(255, 255, 255, 220))
         painter.drawText(x + 6, y + fm.ascent() + 3, text)
 
@@ -171,7 +155,7 @@ class VideoWidget(QWidget):
         sub_font = QFont("Ubuntu", 9)
         painter.setFont(sub_font)
         if self._status_code == "connecting":
-            painter.setPen(QColor("#60a5fa"))
+            painter.setPen(QColor("#38bdf8"))
             status_display = "Menghubungkan..."
         elif self._status_code == "reconnecting":
             painter.setPen(QColor("#fbbf24"))
@@ -180,7 +164,7 @@ class VideoWidget(QWidget):
             painter.setPen(QColor("#f87171"))
             status_display = self._status_msg
         else:
-            painter.setPen(QColor("#6b7280"))
+            painter.setPen(QColor("#64748b"))
             status_display = "Klik untuk atur URL" if not self.config.get("url") else "Offline"
 
         painter.drawText(

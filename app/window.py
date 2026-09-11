@@ -1,6 +1,6 @@
 """
 window.py - Minimalist 4-Stream RTSP Window
-Pure 4-box 2x2 stream display with zero toolbar clutter.
+Pure 4-box 2x2 stream display with modern icons and context menus.
 """
 
 from typing import List, Optional
@@ -15,6 +15,7 @@ from app.config import load_config, save_config
 from app.stream_worker import StreamWorker
 from app.widgets.video_widget import VideoWidget
 from app.widgets.settings_dialog import SettingsDialog
+from app.icons import get_icon, get_app_icon
 
 
 class MainWindow(QMainWindow):
@@ -25,6 +26,7 @@ class MainWindow(QMainWindow):
         self.config = load_config()
 
         self.setWindowTitle("RTSP Multi-View (4 Stream)")
+        self.setWindowIcon(get_app_icon())
         self.resize(1100, 680)
         self.setMinimumSize(640, 400)
         self.setStyleSheet("background-color: #030712;")
@@ -38,7 +40,7 @@ class MainWindow(QMainWindow):
 
         self.grid = QGridLayout(self.central_widget)
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(2)  # Thin clean separator line between camera boxes
+        self.grid.setSpacing(2)  # Clean 2px separator between stream tiles
 
         positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
         for ch in range(4):
@@ -50,7 +52,6 @@ class MainWindow(QMainWindow):
             self.grid.addWidget(vw, r, c)
             self.video_widgets.append(vw)
 
-        # Equal stretches for 2x2 grid
         self.grid.setRowStretch(0, 1)
         self.grid.setRowStretch(1, 1)
         self.grid.setColumnStretch(0, 1)
@@ -66,32 +67,19 @@ class MainWindow(QMainWindow):
     def contextMenuEvent(self, event):
         """Global right click menu for quick access."""
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1f2937;
-                color: #f3f4f6;
-                border: 1px solid #374151;
-                border-radius: 6px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 6px 18px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #2563eb;
-                color: #ffffff;
-            }
-        """)
-        act_settings = menu.addAction("⚙ Pengaturan RTSP (F2)...")
+
+        act_settings = menu.addAction(get_icon("settings"), "Pengaturan RTSP (F2)...")
         act_settings.triggered.connect(lambda: self.open_settings(0))
         menu.addSeparator()
-        act_reload = menu.addAction("🔄 Hubungkan Ulang Semua")
+
+        act_reload = menu.addAction(get_icon("refresh"), "Hubungkan Ulang Semua")
         act_reload.triggered.connect(self.start_all_streams)
-        act_stop = menu.addAction("■ Hentikan Semua")
+
+        act_stop = menu.addAction(get_icon("stop"), "Hentikan Semua")
         act_stop.triggered.connect(self.stop_all_streams)
         menu.addSeparator()
-        act_quit = menu.addAction("✕ Keluar")
+
+        act_quit = menu.addAction(get_icon("exit"), "Keluar")
         act_quit.triggered.connect(self.close)
 
         menu.exec_(event.globalPos())

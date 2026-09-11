@@ -17,6 +17,7 @@ if BASE_DIR not in sys.path:
 from PyQt5.QtWidgets import QApplication
 from app.styles import DARK_THEME_QSS
 from app.window import MainWindow
+from app.icons import get_app_icon
 
 
 def main():
@@ -24,6 +25,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("RTSP Multi-View")
+    app.setWindowIcon(get_app_icon())
     app.setStyleSheet(DARK_THEME_QSS)
 
     window = MainWindow()

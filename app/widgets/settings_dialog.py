@@ -1,26 +1,26 @@
 """
-settings_dialog.py - Clean RTSP Stream Configuration Dialog
-Contains only essential settings: Camera Name, URL with inline Test button, and Transport.
+settings_dialog.py - Clean, Modern RTSP Stream Settings Dialog
+Features vector icons, inline connection testing, and automatic TCP transport.
 """
 
 import subprocess
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
-    QLabel, QLineEdit, QComboBox, QPushButton, QGridLayout
+    QLabel, QLineEdit, QPushButton, QGridLayout, QFrame
 )
 
 from app.config import save_config
+from app.icons import get_icon, get_app_icon
 
 
 class ProbeWorker(QThread):
-    """Background worker to test RTSP URL without freezing UI."""
+    """Background worker to probe RTSP URL without freezing UI."""
     probe_finished = pyqtSignal(bool, str)
 
-    def __init__(self, url: str, transport: str, parent=None):
+    def __init__(self, url: str, parent=None):
         super().__init__(parent)
         self.url = url.strip()
-        self.transport = transport
 
     def run(self):
         if not self.url:
@@ -35,7 +35,7 @@ class ProbeWorker(QThread):
             "-timeout", "5000000"
         ]
         if self.url.startswith("rtsp://"):
-            cmd.extend(["-rtsp_transport", self.transport])
+            cmd.extend(["-rtsp_transport", "tcp"])
         cmd.extend(["-i", self.url])
 
         try:
@@ -77,7 +77,7 @@ class ProbeWorker(QThread):
                 elif "timed out" in err.lower():
                     err_msg = "Waktu koneksi habis (Timeout)."
                 elif "Server returned 401" in err or "Unauthorized" in err:
-                    err_msg = "Username atau password salah (401 Unauthorized)."
+                    err_msg = "Username / password salah (401 Unauthorized)."
                 elif "Server returned 404" in err or "Not Found" in err:
                     err_msg = "Path stream tidak ditemukan (404 Not Found)."
                 else:
@@ -90,7 +90,7 @@ class ProbeWorker(QThread):
 
 
 class SettingsDialog(QDialog):
-    """Clean configuration dialog for the 4 RTSP channels."""
+    """Clean and polished configuration dialog for the 4 RTSP channels."""
     settings_saved = pyqtSignal(dict)
 
     def __init__(self, config: dict, active_tab_index: int = 0, parent=None):
@@ -98,42 +98,48 @@ class SettingsDialog(QDialog):
         self.config = dict(config)
         self.probe_workers = {}
 
-        self.setWindowTitle("Pengaturan URL RTSP")
+        self.setWindowTitle("Pengaturan Kamera RTSP")
+        self.setWindowIcon(get_app_icon())
         self.resize(600, 260)
         self.setModal(True)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(14, 14, 14, 14)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(14)
 
+        # Tab Widget
         self.tabs = QTabWidget(self)
         main_layout.addWidget(self.tabs, 1)
 
-        # Only 4 camera tabs
+        cam_icon = get_icon("camera")
         self.channel_forms = []
         for i in range(4):
             ch_cfg = self.config["channels"][i]
             ch_tab, form_refs = self._create_channel_tab(i, ch_cfg)
             self.channel_forms.append(form_refs)
-            self.tabs.addTab(ch_tab, f"Kamera {i + 1}")
+            self.tabs.addTab(ch_tab, cam_icon, f"Kamera {i + 1}")
 
         if 0 <= active_tab_index < self.tabs.count():
             self.tabs.setCurrentIndex(active_tab_index)
 
-        # Dialog Buttons
-        btn_box = QHBoxLayout()
-        btn_box.addStretch()
+        # Footer Buttons
+        footer = QHBoxLayout()
+        footer.setSpacing(10)
+        footer.addStretch()
 
         btn_cancel = QPushButton("Batal")
+        btn_cancel.setFixedWidth(90)
         btn_cancel.clicked.connect(self.reject)
-        btn_box.addWidget(btn_cancel)
+        footer.addWidget(btn_cancel)
 
         btn_save = QPushButton("Simpan")
+        btn_save.setIcon(get_icon("save"))
         btn_save.setProperty("class", "btn-primary")
+        btn_save.setFixedWidth(110)
         btn_save.clicked.connect(self.save_and_apply)
-        btn_box.addWidget(btn_save)
+        footer.addWidget(btn_save)
 
-        main_layout.addLayout(btn_box)
+        main_layout.addLayout(footer)
 
     def _create_channel_tab(self, ch_index: int, ch_cfg: dict):
         tab = QWidget()
@@ -141,72 +147,71 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
-        grid = QGridLayout()
-        grid.setSpacing(10)
+        card = QFrame(tab)
+        card.setObjectName("settingsCard")
+        card_layout = QGridLayout(card)
+        card_layout.setContentsMargins(12, 12, 12, 12)
+        card_layout.setSpacing(10)
         row = 0
 
         # 1. Camera Name
-        grid.addWidget(QLabel("Nama Kamera:"), row, 0)
+        card_layout.addWidget(QLabel("Nama Kamera:"), row, 0)
         txt_name = QLineEdit(ch_cfg.get("name", f"Kamera {ch_index + 1}"))
-        grid.addWidget(txt_name, row, 1)
+        txt_name.setPlaceholderText(f"Contoh: Kamera {ch_index + 1}")
+        card_layout.addWidget(txt_name, row, 1)
         row += 1
 
         # 2. RTSP URL with inline Test button
-        grid.addWidget(QLabel("URL RTSP:"), row, 0)
+        card_layout.addWidget(QLabel("URL RTSP:"), row, 0)
 
         url_row = QHBoxLayout()
         url_row.setSpacing(6)
         txt_url = QLineEdit(ch_cfg.get("url", ""))
-        txt_url.setPlaceholderText("rtsp://username:password@ip:port/path")
+        txt_url.setPlaceholderText("rtsp://username:password@ip:port/stream")
         url_row.addWidget(txt_url, 1)
 
-        btn_test = QPushButton("🔍 Uji Stream")
-        btn_test.setToolTip("Tes koneksi dan deteksi resolusi stream ini")
+        btn_test = QPushButton("Uji Stream")
+        btn_test.setIcon(get_icon("search"))
+        btn_test.setToolTip("Tes koneksi dan otomatis deteksi resolusi stream ini")
+        btn_test.setObjectName("btnTestStream")
         url_row.addWidget(btn_test)
 
-        grid.addLayout(url_row, row, 1)
+        card_layout.addLayout(url_row, row, 1)
         row += 1
 
         # 3. Test Result Label
         lbl_test_res = QLabel("")
         lbl_test_res.setWordWrap(True)
-        lbl_test_res.setStyleSheet("font-size: 12px; color: #9ca3af;")
-        grid.addWidget(lbl_test_res, row, 1)
+        lbl_test_res.setStyleSheet("font-size: 12px; color: #64748b; padding-left: 2px;")
+        card_layout.addWidget(lbl_test_res, row, 1)
         row += 1
 
-        # 4. Transport Protocol
-        grid.addWidget(QLabel("Transport:"), row, 0)
-        cmb_transport = QComboBox()
-        cmb_transport.addItem("TCP (Disarankan - Stabil)", "tcp")
-        cmb_transport.addItem("UDP (Latensi Rendah)", "udp")
-        idx_t = 0 if ch_cfg.get("transport", "tcp").lower() == "tcp" else 1
-        cmb_transport.setCurrentIndex(idx_t)
-        grid.addWidget(cmb_transport, row, 1)
-        row += 1
-
-        layout.addLayout(grid)
+        layout.addWidget(card)
         layout.addStretch()
 
         # Connect Test Button
         def run_test():
             url = txt_url.text().strip()
-            trans = cmb_transport.currentData()
             if not url:
                 lbl_test_res.setText("✗ Masukkan URL RTSP terlebih dahulu.")
                 lbl_test_res.setStyleSheet("font-size: 12px; color: #f87171;")
                 return
 
             lbl_test_res.setText("Menghubungi stream...")
-            lbl_test_res.setStyleSheet("font-size: 12px; color: #60a5fa;")
+            lbl_test_res.setStyleSheet("font-size: 12px; color: #38bdf8;")
             btn_test.setEnabled(False)
 
-            worker = ProbeWorker(url, trans)
+            worker = ProbeWorker(url)
             self.probe_workers[ch_index] = worker
 
             def on_finished(success, msg):
                 btn_test.setEnabled(True)
                 lbl_test_res.setText(msg)
-                lbl_test_res.setStyleSheet("font-size: 12px; color: #34d399;" if success else "font-size: 12px; color: #f87171;")
+                lbl_test_res.setStyleSheet(
+                    "font-size: 12px; color: #34d399; font-weight: 500;"
+                    if success else
+                    "font-size: 12px; color: #f87171; font-weight: 500;"
+                )
 
             worker.probe_finished.connect(on_finished)
             worker.start()
@@ -216,7 +221,6 @@ class SettingsDialog(QDialog):
         refs = {
             "name": txt_name,
             "url": txt_url,
-            "transport": cmb_transport,
         }
         return tab, refs
 
@@ -226,7 +230,6 @@ class SettingsDialog(QDialog):
             refs = self.channel_forms[i]
             new_cfg["channels"][i]["name"] = refs["name"].text().strip() or f"Kamera {i + 1}"
             new_cfg["channels"][i]["url"] = refs["url"].text().strip()
-            new_cfg["channels"][i]["transport"] = refs["transport"].currentData()
 
         save_config(new_cfg)
         self.settings_saved.emit(new_cfg)

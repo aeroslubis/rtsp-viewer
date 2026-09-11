@@ -1,0 +1,30 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'>
+        <defs>
+            <linearGradient id='bgGrad' x1='0%' y1='0%' x2='100%' y2='100%'>
+                <stop offset='0%' stop-color='#0f172a'/>
+                <stop offset='100%' stop-color='#1e293b'/>
+            </linearGradient>
+            <linearGradient id='cyanGrad' x1='0%' y1='0%' x2='100%' y2='100%'>
+                <stop offset='0%' stop-color='#38bdf8'/>
+                <stop offset='100%' stop-color='#2563eb'/>
+            </linearGradient>
+        </defs>
+        <rect width='128' height='128' rx='28' fill='url(#bgGrad)' stroke='#334155' stroke-width='3'/>
+        <!-- 4 Grid Panels -->
+        <rect x='16' y='16' width='44' height='36' rx='8' fill='#090d16' stroke='#1e293b' stroke-width='2'/>
+        <rect x='68' y='16' width='44' height='36' rx='8' fill='#090d16' stroke='#1e293b' stroke-width='2'/>
+        <rect x='16' y='60' width='44' height='36' rx='8' fill='#090d16' stroke='#1e293b' stroke-width='2'/>
+        <rect x='68' y='60' width='44' height='36' rx='8' fill='#090d16' stroke='#1e293b' stroke-width='2'/>
+        <!-- Camera Icon in Center Badge -->
+        <circle cx='64' cy='56' r='24' fill='#0f172a' stroke='url(#cyanGrad)' stroke-width='3'/>
+        <path d='M74 50l-8 4.5 8 4.5V50z' fill='url(#cyanGrad)'/>
+        <rect x='52' y='48' width='14' height='16' rx='3' fill='url(#cyanGrad)'/>
+        <circle cx='59' cy='56' r='3' fill='#0f172a'/>
+        <!-- Status indicator dots -->
+        <circle cx='24' cy='24' r='3' fill='#10b981'/>
+        <circle cx='76' cy='24' r='3' fill='#10b981'/>
+        <circle cx='24' cy='68' r='3' fill='#10b981'/>
+        <circle cx='76' cy='68' r='3' fill='#10b981'/>
+        <!-- Subtle base bar -->
+        <rect x='34' y='106' width='60' height='6' rx='3' fill='#334155'/>
+    </svg>

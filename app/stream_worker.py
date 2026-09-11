@@ -135,7 +135,7 @@ class StreamWorker(QThread):
                 "-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"
             ]
 
-        transport = self.config.get("transport", "tcp").lower()
+        transport = "tcp"
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error"
         ]

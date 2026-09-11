@@ -2,9 +2,9 @@
 Type=Application
 Name=RTSP Multi-View
 GenericName=CCTV RTSP Monitor 4-Channel
-Comment=Linux GUI untuk menampilkan 4 stream RTSP IP Camera
+Comment=Linux GUI minimalis untuk menampilkan 4 stream RTSP IP Camera
 Exec=/home/aeros/Work/rtsp_viewer/run.sh
-Icon=camera-video
+Icon=/home/aeros/Work/rtsp_viewer/assets/app_icon.png
 Terminal=false
 Categories=AudioVideo;Video;
 Keywords=rtsp;cctv;ipcam;camera;stream;dahua;imou;hikvision;tapo;

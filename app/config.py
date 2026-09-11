@@ -1,5 +1,6 @@
 """
 config.py - Simplified Configuration Manager for 4 RTSP Channels
+Defaults strictly to TCP for maximum stability and low latency.
 """
 
 import json
@@ -14,28 +15,24 @@ DEFAULT_CONFIG = {
             "id": 0,
             "name": "Kamera 1",
             "url": "",
-            "transport": "tcp",
             "auto_connect": True
         },
         {
             "id": 1,
             "name": "Kamera 2",
             "url": "",
-            "transport": "tcp",
             "auto_connect": True
         },
         {
             "id": 2,
             "name": "Kamera 3",
             "url": "",
-            "transport": "tcp",
             "auto_connect": True
         },
         {
             "id": 3,
             "name": "Kamera 4",
             "url": "",
-            "transport": "tcp",
             "auto_connect": True
         }
     ],
