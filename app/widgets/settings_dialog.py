@@ -1,16 +1,16 @@
 """
-settings_dialog.py - Clean, Modern RTSP Stream Settings Dialog
-Features vector icons, inline connection testing, and automatic TCP transport.
+settings_dialog.py - RTSP Stream Settings Dialog for 4, 6, or 12 Channels
+Allows selecting layout stream count (4, 6, 12), configuring each channel, and testing stream URLs.
 """
 
 import subprocess
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
-    QLabel, QLineEdit, QPushButton, QGridLayout, QFrame
+    QLabel, QLineEdit, QPushButton, QGridLayout, QFrame, QComboBox
 )
 
-from app.config import save_config
+from app.config import save_config, MAX_CHANNELS, SUPPORTED_STREAM_COUNTS
 from app.icons import get_icon, get_app_icon
 
 
@@ -41,6 +41,7 @@ class ProbeWorker(QThread):
         try:
             proc = subprocess.run(
                 cmd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -90,7 +91,7 @@ class ProbeWorker(QThread):
 
 
 class SettingsDialog(QDialog):
-    """Clean and polished configuration dialog for the 4 RTSP channels."""
+    """Configuration dialog supporting 4, 6, and 12 stream channels."""
     settings_saved = pyqtSignal(dict)
 
     def __init__(self, config: dict, active_tab_index: int = 0, parent=None):
@@ -100,26 +101,54 @@ class SettingsDialog(QDialog):
 
         self.setWindowTitle("Pengaturan Kamera RTSP")
         self.setWindowIcon(get_app_icon())
-        self.resize(600, 260)
+        self.resize(650, 310)
         self.setModal(True)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(14)
+        main_layout.setSpacing(12)
 
-        # Tab Widget
+        # Top Control: Grid Stream Count Selection
+        top_bar = QHBoxLayout()
+        lbl_count = QLabel("Jumlah Stream Tampil:")
+        lbl_count.setStyleSheet("font-weight: 600; color: #f1f5f9; font-size: 13px;")
+        top_bar.addWidget(lbl_count)
+
+        self.cmb_stream_count = QComboBox()
+        self.cmb_stream_count.addItem("4 Stream (2x2 Grid)", 4)
+        self.cmb_stream_count.addItem("6 Stream (2x3 Grid)", 6)
+        self.cmb_stream_count.addItem("12 Stream (3x4 Grid)", 12)
+
+        current_count = self.config.get("general", {}).get("stream_count", 4)
+        if current_count == 6:
+            self.cmb_stream_count.setCurrentIndex(1)
+        elif current_count == 12:
+            self.cmb_stream_count.setCurrentIndex(2)
+        else:
+            self.cmb_stream_count.setCurrentIndex(0)
+
+        self.cmb_stream_count.currentIndexChanged.connect(self._on_stream_count_changed)
+        top_bar.addWidget(self.cmb_stream_count)
+        top_bar.addStretch()
+        main_layout.addLayout(top_bar)
+
+        # Tab Widget for 12 Channels
         self.tabs = QTabWidget(self)
+        self.tabs.setUsesScrollButtons(True)
         main_layout.addWidget(self.tabs, 1)
 
         cam_icon = get_icon("camera")
         self.channel_forms = []
-        for i in range(4):
+        for i in range(MAX_CHANNELS):
             ch_cfg = self.config["channels"][i]
             ch_tab, form_refs = self._create_channel_tab(i, ch_cfg)
             self.channel_forms.append(form_refs)
             self.tabs.addTab(ch_tab, cam_icon, f"Kamera {i + 1}")
 
-        if 0 <= active_tab_index < self.tabs.count():
+        # Update tab visibility according to stream count
+        self._update_tab_visibility(current_count)
+
+        if 0 <= active_tab_index < current_count:
             self.tabs.setCurrentIndex(active_tab_index)
 
         # Footer Buttons
@@ -141,10 +170,20 @@ class SettingsDialog(QDialog):
 
         main_layout.addLayout(footer)
 
+    def _on_stream_count_changed(self):
+        count = self.cmb_stream_count.currentData()
+        self._update_tab_visibility(count)
+
+    def _update_tab_visibility(self, count: int):
+        for i in range(MAX_CHANNELS):
+            self.tabs.setTabVisible(i, i < count)
+        if self.tabs.currentIndex() >= count:
+            self.tabs.setCurrentIndex(0)
+
     def _create_channel_tab(self, ch_index: int, ch_cfg: dict):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
         card = QFrame(tab)
@@ -189,7 +228,6 @@ class SettingsDialog(QDialog):
         layout.addWidget(card)
         layout.addStretch()
 
-        # Connect Test Button
         def run_test():
             url = txt_url.text().strip()
             if not url:
@@ -226,7 +264,9 @@ class SettingsDialog(QDialog):
 
     def save_and_apply(self):
         new_cfg = dict(self.config)
-        for i in range(4):
+        new_cfg["general"]["stream_count"] = self.cmb_stream_count.currentData()
+
+        for i in range(MAX_CHANNELS):
             refs = self.channel_forms[i]
             new_cfg["channels"][i]["name"] = refs["name"].text().strip() or f"Kamera {i + 1}"
             new_cfg["channels"][i]["url"] = refs["url"].text().strip()
