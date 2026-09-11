@@ -67,7 +67,10 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Escape"), self, self._on_escape_pressed)
 
         # Auto-connect streams on startup
-        QTimer.singleShot(200, self.start_all_active_streams)
+        self._startup_timer = QTimer(self)
+        self._startup_timer.setSingleShot(True)
+        self._startup_timer.timeout.connect(self.start_all_active_streams)
+        self._startup_timer.start(200)
 
     def _on_escape_pressed(self):
         if self.maximized_channel is not None:
@@ -237,7 +240,7 @@ class MainWindow(QMainWindow):
             return
 
         self.video_widgets[ch].set_fullscreen_mode(is_fullscreen)
-        worker = StreamWorker(ch, ch_cfg, is_fullscreen=is_fullscreen, parent=self)
+        worker = StreamWorker(ch, ch_cfg, is_fullscreen=is_fullscreen)
         self.workers[ch] = worker
         self.video_widgets[ch].attach_worker(worker)
         worker.start()
@@ -245,8 +248,9 @@ class MainWindow(QMainWindow):
     def stop_single_stream(self, ch: int):
         worker = self.workers[ch]
         if worker:
-            worker.stop()
             self.workers[ch] = None
+            worker.stop()
+            worker.deleteLater()
 
     def start_all_active_streams(self):
         for ch in range(self.stream_count):
@@ -271,6 +275,8 @@ class MainWindow(QMainWindow):
         self.apply_grid(new_count, auto_start=True)
 
     def closeEvent(self, event):
+        if hasattr(self, "_startup_timer"):
+            self._startup_timer.stop()
         for ch in range(MAX_CHANNELS):
             self.stop_single_stream(ch)
         event.accept()

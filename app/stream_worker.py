@@ -145,7 +145,10 @@ class StreamWorker(QThread):
                         "reconnecting",
                         f"Mencoba ulang ({remaining}s)..."
                     )
-                    time.sleep(1.0)
+                    for _ in range(10):
+                        if not self._running:
+                            break
+                        time.sleep(0.1)
             else:
                 self.status_changed.emit(self.channel_id, "error", "Terputus")
                 break
@@ -207,4 +210,4 @@ class StreamWorker(QThread):
         """Stop worker and kill subprocess immediately."""
         self._running = False
         self._cleanup_stream_proc()
-        self.wait(300)
+        self.wait(1000)
