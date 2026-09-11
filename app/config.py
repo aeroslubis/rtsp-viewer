@@ -1,6 +1,6 @@
 """
-config.py - Configuration Manager supporting 4, 6, and 12 RTSP Channels
-Features intelligent dual-stream resolution (102 for live grid, 101 for fullscreen).
+config.py - Configuration Manager supporting Main Stream and Sub Stream URLs
+Features 4, 6, and 12 RTSP Channels with distinct main (HD) and sub (SD) streams.
 """
 
 import json
@@ -17,7 +17,8 @@ DEFAULT_CONFIG = {
         {
             "id": i,
             "name": f"Kamera {i + 1}",
-            "url": "",
+            "main_url": "",
+            "sub_url": "",
             "auto_connect": True
         }
         for i in range(MAX_CHANNELS)
@@ -32,16 +33,15 @@ DEFAULT_CONFIG = {
 
 def resolve_stream_url(url: str, is_fullscreen: bool) -> str:
     """
-    Intelligently select stream endpoint:
-    - is_fullscreen=False (Live Grid): uses stream 102 (Sub Stream / SD) for low CPU & bandwidth.
-    - is_fullscreen=True (Fullscreen View): uses stream 101 (Main Stream / HD) for crystal clear video.
+    Intelligently fallback stream endpoint if sub_url is not explicitly provided:
+    - is_fullscreen=False (Live Grid): converts 101 to 102.
+    - is_fullscreen=True (Fullscreen View): converts 102 to 101.
     """
     url = url.strip()
     if not url:
         return ""
 
     if is_fullscreen:
-        # Main Stream 101 (HD)
         if "/102" in url:
             return url.replace("/102", "/101", 1)
         elif "subtype=1" in url:
@@ -50,7 +50,6 @@ def resolve_stream_url(url: str, is_fullscreen: bool) -> str:
             return url.replace("/stream2", "/stream1", 1)
         return url
     else:
-        # Sub Stream 102 (SD)
         if "/101" in url:
             return url.replace("/101", "/102", 1)
         elif "subtype=0" in url:
@@ -78,12 +77,22 @@ def load_config() -> dict:
                     if sc not in SUPPORTED_STREAM_COUNTS:
                         config["general"]["stream_count"] = 4
 
-                # Merge saved channels preserving existing URLs and names
+                # Merge saved channels
                 if "channels" in saved and isinstance(saved["channels"], list):
                     for i, saved_ch in enumerate(saved["channels"]):
                         if i < MAX_CHANNELS and isinstance(saved_ch, dict):
                             config["channels"][i]["name"] = saved_ch.get("name", f"Kamera {i + 1}")
-                            config["channels"][i]["url"] = saved_ch.get("url", "")
+                            
+                            # Support both legacy 'url' and new 'main_url'/'sub_url'
+                            main_url = saved_ch.get("main_url", saved_ch.get("url", ""))
+                            sub_url = saved_ch.get("sub_url", "")
+                            
+                            # If sub_url was empty but main_url has /101, auto-populate sub_url
+                            if not sub_url and main_url and "/101" in main_url:
+                                sub_url = main_url.replace("/101", "/102", 1)
+                                
+                            config["channels"][i]["main_url"] = main_url
+                            config["channels"][i]["sub_url"] = sub_url
                             config["channels"][i]["auto_connect"] = saved_ch.get("auto_connect", True)
                 return config
     except Exception as e:

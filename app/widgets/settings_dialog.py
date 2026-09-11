@@ -1,6 +1,6 @@
 """
-settings_dialog.py - RTSP Stream Settings Dialog for 4, 6, or 12 Channels
-Features neatly aligned grid dropdown, dual-stream (101/102) testing, and vector icons.
+settings_dialog.py - RTSP Stream Settings Dialog with Main Stream and Sub Stream URLs
+Allows setting separate Main Stream (HD / Fullscreen) and Sub Stream (SD / Live Grid) URLs.
 """
 
 import subprocess
@@ -18,9 +18,10 @@ class ProbeWorker(QThread):
     """Background worker to probe RTSP URL without freezing UI."""
     probe_finished = pyqtSignal(bool, str)
 
-    def __init__(self, url: str, parent=None):
+    def __init__(self, url: str, stream_label: str = "", parent=None):
         super().__init__(parent)
         self.url = url.strip()
+        self.stream_label = stream_label
 
     def run(self):
         if not self.url:
@@ -69,11 +70,8 @@ class ProbeWorker(QThread):
                     except Exception:
                         pass
 
-                dual_info = ""
-                if "/101" in self.url or "/102" in self.url:
-                    dual_info = " (Otomatis: 102 Live Grid / 101 Fullscreen)"
-
-                msg = f"✓ Terhubung! Resolusi: {w}x{h} ({codec}{fps_str}){dual_info}"
+                tag = f"[{self.stream_label}] " if self.stream_label else ""
+                msg = f"✓ Terhubung! {tag}Resolusi: {w}x{h} ({codec}{fps_str})"
                 self.probe_finished.emit(True, msg)
             else:
                 err = proc.stderr.strip()
@@ -86,7 +84,7 @@ class ProbeWorker(QThread):
                 elif "Server returned 404" in err or "Not Found" in err:
                     err_msg = "Path stream tidak ditemukan (404 Not Found)."
                 else:
-                    err_msg = err[:80] if err else "Tidak dapat tersambung ke stream."
+                    err_msg = err[:70] if err else "Tidak dapat tersambung ke stream."
                 self.probe_finished.emit(False, f"✗ {err_msg}")
         except subprocess.TimeoutExpired:
             self.probe_finished.emit(False, "✗ Waktu koneksi habis (Timeout 7 detik).")
@@ -95,17 +93,17 @@ class ProbeWorker(QThread):
 
 
 class SettingsDialog(QDialog):
-    """Clean, polished configuration dialog for 4, 6, and 12 stream channels."""
+    """Clean, polished configuration dialog for Main Stream and Sub Stream URLs."""
     settings_saved = pyqtSignal(dict)
 
     def __init__(self, config: dict, active_tab_index: int = 0, parent=None):
         super().__init__(parent)
         self.config = dict(config)
-        self.probe_workers = {}
+        self.probe_workers = []
 
         self.setWindowTitle("Pengaturan Kamera RTSP")
         self.setWindowIcon(get_app_icon())
-        self.resize(650, 310)
+        self.resize(700, 390)
         self.setModal(True)
 
         main_layout = QVBoxLayout(self)
@@ -199,8 +197,8 @@ class SettingsDialog(QDialog):
         card = QFrame(tab)
         card.setObjectName("settingsCard")
         card_layout = QGridLayout(card)
-        card_layout.setContentsMargins(12, 12, 12, 12)
-        card_layout.setSpacing(10)
+        card_layout.setContentsMargins(14, 12, 14, 12)
+        card_layout.setSpacing(8)
         row = 0
 
         # 1. Camera Name
@@ -210,65 +208,134 @@ class SettingsDialog(QDialog):
         card_layout.addWidget(txt_name, row, 1)
         row += 1
 
-        # 2. RTSP URL with inline Test button
-        card_layout.addWidget(QLabel("URL RTSP:"), row, 0)
+        # 2. Main Stream URL (HD / Fullscreen)
+        card_layout.addWidget(QLabel("URL Main Stream:"), row, 0)
+        url_main_row = QHBoxLayout()
+        url_main_row.setSpacing(6)
 
-        url_row = QHBoxLayout()
-        url_row.setSpacing(6)
-        txt_url = QLineEdit(ch_cfg.get("url", ""))
-        txt_url.setPlaceholderText("rtsp://username:password@ip:port/stream/101")
-        url_row.addWidget(txt_url, 1)
+        initial_main = ch_cfg.get("main_url", ch_cfg.get("url", ""))
+        txt_main_url = QLineEdit(initial_main)
+        txt_main_url.setPlaceholderText("rtsp://username:password@ip:port/zona/101 (HD Fullscreen)")
+        url_main_row.addWidget(txt_main_url, 1)
 
-        btn_test = QPushButton("Uji Stream")
-        btn_test.setIcon(get_icon("search"))
-        btn_test.setToolTip("Tes koneksi stream (otomatis deteksi 101 HD dan 102 SD)")
-        btn_test.setObjectName("btnTestStream")
-        url_row.addWidget(btn_test)
+        btn_test_main = QPushButton("Uji Main")
+        btn_test_main.setIcon(get_icon("search"))
+        btn_test_main.setToolTip("Tes koneksi Main Stream (HD / 101)")
+        btn_test_main.setObjectName("btnTestStream")
+        url_main_row.addWidget(btn_test_main)
 
-        card_layout.addLayout(url_row, row, 1)
+        card_layout.addLayout(url_main_row, row, 1)
         row += 1
 
-        # 3. Test Result Label
-        lbl_test_res = QLabel("")
-        lbl_test_res.setWordWrap(True)
-        lbl_test_res.setStyleSheet("font-size: 12px; color: #64748b; padding-left: 2px;")
-        card_layout.addWidget(lbl_test_res, row, 1)
+        # Main Stream Result Label
+        lbl_test_main = QLabel("")
+        lbl_test_main.setWordWrap(True)
+        lbl_test_main.setStyleSheet("font-size: 11px; color: #64748b; padding-left: 2px;")
+        card_layout.addWidget(lbl_test_main, row, 1)
+        row += 1
+
+        # 3. Sub Stream URL (SD / Live Grid)
+        card_layout.addWidget(QLabel("URL Sub Stream:"), row, 0)
+        url_sub_row = QHBoxLayout()
+        url_sub_row.setSpacing(6)
+
+        initial_sub = ch_cfg.get("sub_url", "")
+        txt_sub_url = QLineEdit(initial_sub)
+        txt_sub_url.setPlaceholderText("rtsp://username:password@ip:port/zona/102 (SD Live Grid)")
+        url_sub_row.addWidget(txt_sub_url, 1)
+
+        btn_test_sub = QPushButton("Uji Sub")
+        btn_test_sub.setIcon(get_icon("search"))
+        btn_test_sub.setToolTip("Tes koneksi Sub Stream (SD / 102)")
+        btn_test_sub.setObjectName("btnTestStream")
+        url_sub_row.addWidget(btn_test_sub)
+
+        card_layout.addLayout(url_sub_row, row, 1)
+        row += 1
+
+        # Sub Stream Result Label
+        lbl_test_sub = QLabel("")
+        lbl_test_sub.setWordWrap(True)
+        lbl_test_sub.setStyleSheet("font-size: 11px; color: #64748b; padding-left: 2px;")
+        card_layout.addWidget(lbl_test_sub, row, 1)
         row += 1
 
         layout.addWidget(card)
         layout.addStretch()
 
-        def run_test():
-            url = txt_url.text().strip()
+        # Auto-suggest Sub Stream when typing Main Stream if sub is empty
+        def on_main_text_changed(text):
+            if not txt_sub_url.text().strip() and "/101" in text:
+                txt_sub_url.setText(text.replace("/101", "/102", 1))
+
+        txt_main_url.textChanged.connect(on_main_text_changed)
+
+        # Test Main Stream Worker
+        def test_main():
+            url = txt_main_url.text().strip()
             if not url:
-                lbl_test_res.setText("✗ Masukkan URL RTSP terlebih dahulu.")
-                lbl_test_res.setStyleSheet("font-size: 12px; color: #f87171;")
+                lbl_test_main.setText("✗ Masukkan URL Main Stream terlebih dahulu.")
+                lbl_test_main.setStyleSheet("font-size: 11px; color: #f87171;")
                 return
 
-            lbl_test_res.setText("Menghubungi stream...")
-            lbl_test_res.setStyleSheet("font-size: 12px; color: #38bdf8;")
-            btn_test.setEnabled(False)
+            lbl_test_main.setText("Menghubungi Main Stream...")
+            lbl_test_main.setStyleSheet("font-size: 11px; color: #38bdf8;")
+            btn_test_main.setEnabled(False)
 
-            worker = ProbeWorker(url)
-            self.probe_workers[ch_index] = worker
+            worker = ProbeWorker(url, "Main Stream")
+            self.probe_workers.append(worker)
 
             def on_finished(success, msg):
-                btn_test.setEnabled(True)
-                lbl_test_res.setText(msg)
-                lbl_test_res.setStyleSheet(
-                    "font-size: 12px; color: #34d399; font-weight: 500;"
+                btn_test_main.setEnabled(True)
+                lbl_test_main.setText(msg)
+                lbl_test_main.setStyleSheet(
+                    "font-size: 11px; color: #34d399; font-weight: 500;"
                     if success else
-                    "font-size: 12px; color: #f87171; font-weight: 500;"
+                    "font-size: 11px; color: #f87171; font-weight: 500;"
                 )
 
             worker.probe_finished.connect(on_finished)
             worker.start()
 
-        btn_test.clicked.connect(run_test)
+        # Test Sub Stream Worker
+        def test_sub():
+            url = txt_sub_url.text().strip()
+            if not url:
+                # If sub is empty, fallback to auto-derived from main
+                main_val = txt_main_url.text().strip()
+                if main_val:
+                    url = resolve_stream_url(main_val, is_fullscreen=False)
+                else:
+                    lbl_test_sub.setText("✗ Masukkan URL Sub Stream terlebih dahulu.")
+                    lbl_test_sub.setStyleSheet("font-size: 11px; color: #f87171;")
+                    return
+
+            lbl_test_sub.setText("Menghubungi Sub Stream...")
+            lbl_test_sub.setStyleSheet("font-size: 11px; color: #38bdf8;")
+            btn_test_sub.setEnabled(False)
+
+            worker = ProbeWorker(url, "Sub Stream")
+            self.probe_workers.append(worker)
+
+            def on_finished(success, msg):
+                btn_test_sub.setEnabled(True)
+                lbl_test_sub.setText(msg)
+                lbl_test_sub.setStyleSheet(
+                    "font-size: 11px; color: #34d399; font-weight: 500;"
+                    if success else
+                    "font-size: 11px; color: #f87171; font-weight: 500;"
+                )
+
+            worker.probe_finished.connect(on_finished)
+            worker.start()
+
+        btn_test_main.clicked.connect(test_main)
+        btn_test_sub.clicked.connect(test_sub)
 
         refs = {
             "name": txt_name,
-            "url": txt_url,
+            "main_url": txt_main_url,
+            "sub_url": txt_sub_url,
         }
         return tab, refs
 
@@ -279,7 +346,10 @@ class SettingsDialog(QDialog):
         for i in range(MAX_CHANNELS):
             refs = self.channel_forms[i]
             new_cfg["channels"][i]["name"] = refs["name"].text().strip() or f"Kamera {i + 1}"
-            new_cfg["channels"][i]["url"] = refs["url"].text().strip()
+            new_cfg["channels"][i]["main_url"] = refs["main_url"].text().strip()
+            new_cfg["channels"][i]["sub_url"] = refs["sub_url"].text().strip()
+            # Also keep 'url' field synced to main_url for backward compatibility
+            new_cfg["channels"][i]["url"] = refs["main_url"].text().strip()
 
         save_config(new_cfg)
         self.settings_saved.emit(new_cfg)

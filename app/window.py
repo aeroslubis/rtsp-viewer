@@ -231,7 +231,9 @@ class MainWindow(QMainWindow):
             "reconnect_interval_sec": self.config.get("general", {}).get("reconnect_interval_sec", 4),
         })
 
-        if not ch_cfg.get("url", "").strip():
+        main_url = ch_cfg.get("main_url", ch_cfg.get("url", "")).strip()
+        sub_url = ch_cfg.get("sub_url", "").strip()
+        if not main_url and not sub_url:
             return
 
         self.video_widgets[ch].set_fullscreen_mode(is_fullscreen)

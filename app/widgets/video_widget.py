@@ -107,7 +107,8 @@ class VideoWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self._status_code in ("stopped", "error"):
-            if not self.config.get("url", "").strip():
+            has_url = bool(self.config.get("main_url", "").strip() or self.config.get("url", "").strip())
+            if not has_url:
                 self.request_settings.emit(self.channel_id)
         super().mousePressEvent(event)
 

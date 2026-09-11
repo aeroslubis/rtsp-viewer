@@ -1,6 +1,6 @@
 """
 stream_worker.py - Low-Latency RTSP Stream Worker
-Supports dual-stream: stream 102 (Sub Stream) in grid mode, stream 101 (Main Stream) in fullscreen.
+Supports explicit main_url (used in fullscreen) and sub_url (used in live grid).
 """
 
 import subprocess
@@ -16,8 +16,7 @@ from app.config import resolve_stream_url
 class StreamWorker(QThread):
     """
     Worker thread that decodes an RTSP stream using FFmpeg.
-    Automatically recognizes any stream resolution dynamically.
-    Switches between sub-stream (102) and main-stream (101) based on fullscreen state.
+    Uses sub_url during live grid mode, and main_url during fullscreen mode.
     """
     frame_ready = pyqtSignal(int, QImage, float)   # channel_id, QImage, fps
     status_changed = pyqtSignal(int, str, str)     # channel_id, status_code, message
@@ -43,14 +42,24 @@ class StreamWorker(QThread):
         auto_reconnect = self.config.get("auto_reconnect", True)
 
         while self._running:
-            raw_url = self.config.get("url", "").strip()
-            if not raw_url:
+            main_url = (self.config.get("main_url", "") or self.config.get("url", "")).strip()
+            sub_url = self.config.get("sub_url", "").strip()
+
+            if not main_url and not sub_url:
                 self.status_changed.emit(self.channel_id, "stopped", "Belum ada URL")
                 break
 
-            # Resolve to stream 101 (HD) if fullscreen, or 102 (SD) if grid
-            active_url = resolve_stream_url(raw_url, self.is_fullscreen)
-            stream_type = "101 HD" if self.is_fullscreen else "102 SD"
+            # In fullscreen mode: use main_url (HD)
+            # In grid mode: use sub_url (SD), or auto-derived sub-stream if not filled
+            if self.is_fullscreen:
+                active_url = main_url or sub_url
+                stream_type = "Main HD"
+            else:
+                if sub_url:
+                    active_url = sub_url
+                else:
+                    active_url = resolve_stream_url(main_url, is_fullscreen=False)
+                stream_type = "Sub SD"
 
             self.status_changed.emit(
                 self.channel_id,
