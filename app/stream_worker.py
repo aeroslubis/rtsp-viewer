@@ -1,0 +1,188 @@
+"""
+stream_worker.py - Low-Latency RTSP Stream Worker
+Automatically recognizes any stream resolution and codec.
+"""
+
+import subprocess
+import time
+from typing import Optional
+
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QImage
+
+
+class StreamWorker(QThread):
+    """
+    Worker thread that decodes an RTSP stream using FFmpeg.
+    Automatically recognizes any stream resolution dynamically.
+    """
+    frame_ready = pyqtSignal(int, QImage, float)   # channel_id, QImage, fps
+    status_changed = pyqtSignal(int, str, str)     # channel_id, status_code, message
+
+    def __init__(self, channel_id: int, config: dict, parent=None):
+        super().__init__(parent)
+        self.channel_id = channel_id
+        self.config = config
+        self._running = False
+        self._ffmpeg_proc: Optional[subprocess.Popen] = None
+        self._last_frame: Optional[QImage] = None
+
+    def update_config(self, new_config: dict):
+        self.config = new_config
+
+    def run(self):
+        self._running = True
+        reconnect_interval = self.config.get("reconnect_interval_sec", 4)
+        auto_reconnect = self.config.get("auto_reconnect", True)
+
+        while self._running:
+            url = self.config.get("url", "").strip()
+            if not url:
+                self.status_changed.emit(self.channel_id, "stopped", "Belum ada URL")
+                break
+
+            self.status_changed.emit(self.channel_id, "connecting", "Menghubungkan...")
+
+            try:
+                cmd = self._build_ffmpeg_cmd(url)
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=0
+                )
+                self._ffmpeg_proc = proc
+
+                buf = bytearray()
+                frame_count = 0
+                t_last_fps = time.time()
+                current_fps = 0.0
+                first_frame_received = False
+
+                while self._running:
+                    chunk = proc.stdout.read(16384)
+                    if not chunk:
+                        break
+                    buf.extend(chunk)
+
+                    while self._running:
+                        soi = buf.find(b"\xff\xd8")
+                        if soi == -1:
+                            buf = bytearray()
+                            break
+                        eoi = buf.find(b"\xff\xd9", soi + 2)
+                        if eoi == -1:
+                            if soi > 0:
+                                buf = buf[soi:]
+                            break
+
+                        jpg_bytes = buf[soi:eoi+2]
+                        buf = buf[eoi+2:]
+
+                        qimg = QImage.fromData(jpg_bytes)
+                        if not qimg or qimg.isNull():
+                            continue
+
+                        self._last_frame = qimg
+                        frame_count += 1
+                        t_now = time.time()
+                        dt = t_now - t_last_fps
+                        if dt >= 1.0:
+                            current_fps = frame_count / dt
+                            frame_count = 0
+                            t_last_fps = t_now
+
+                        if not first_frame_received:
+                            first_frame_received = True
+                            self.status_changed.emit(
+                                self.channel_id,
+                                "live",
+                                f"Live ({qimg.width()}x{qimg.height()})"
+                            )
+
+                        self.frame_ready.emit(self.channel_id, qimg, current_fps)
+
+            except Exception as e:
+                self.status_changed.emit(self.channel_id, "error", f"Error: {str(e)[:30]}")
+
+            finally:
+                self._cleanup_stream_proc()
+
+            if not self._running:
+                break
+
+            if auto_reconnect:
+                for remaining in range(reconnect_interval, 0, -1):
+                    if not self._running:
+                        break
+                    self.status_changed.emit(
+                        self.channel_id,
+                        "reconnecting",
+                        f"Mencoba ulang ({remaining}s)..."
+                    )
+                    time.sleep(1.0)
+            else:
+                self.status_changed.emit(self.channel_id, "error", "Terputus")
+                break
+
+        self.status_changed.emit(self.channel_id, "stopped", "Offline")
+
+    def _build_ffmpeg_cmd(self, url: str) -> list:
+        if url.startswith("testsrc") or url.startswith("smptebars") or url.startswith("mandelbrot"):
+            return [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-re", "-f", "lavfi", "-i", url,
+                "-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"
+            ]
+
+        transport = self.config.get("transport", "tcp").lower()
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error"
+        ]
+
+        if url.startswith("rtsp://"):
+            cmd.extend([
+                "-rtsp_transport", transport,
+                "-timeout", "5000000"  # 5s socket timeout
+            ])
+
+        cmd.extend([
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-strict", "experimental",
+            "-probesize", "65536",
+            "-analyzeduration", "500000",
+            "-i", url,
+            "-f", "image2pipe",
+            "-vcodec", "mjpeg",
+            "-q:v", "3",
+            "pipe:1"
+        ])
+        return cmd
+
+    def _cleanup_stream_proc(self):
+        proc = self._ffmpeg_proc
+        self._ffmpeg_proc = None
+        if proc:
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
+            try:
+                proc.stderr.close()
+            except Exception:
+                pass
+            try:
+                proc.terminate()
+                proc.wait(timeout=1.0)
+            except Exception:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    pass
+
+    def stop(self):
+        self._running = False
+        self._cleanup_stream_proc()
+        self.wait(1500)
